@@ -9,6 +9,22 @@ from PIL import Image
 from psutil import cpu_count
 
 from utils import *
+from object_detection.utils import dataset_util, label_map_util
+
+
+
+def build_bounding_box(open_dataset_box):
+    center_x = open_dataset_box.center_x
+    center_y = open_dataset_box.center_y
+    length = open_dataset_box.length
+    width = open_dataset_box.width
+
+
+    ymin = center_y -width / 2
+    ymax = center_y + width / 2
+    xmin = center_x -length / 2
+    xmax = center_x + length / 2
+    return xmin, xmax, ymin, ymax
 
 
 def create_tf_example(filename, encoded_jpeg, annotations):
@@ -25,7 +41,30 @@ def create_tf_example(filename, encoded_jpeg, annotations):
     """
 
     # TODO: Implement function to convert the data
+    encoded_jpg_io = io.BytesIO(encoded_jpeg)
+    image = Image.open(encoded_jpg_io)
+    width, height = image.size
+    
+    image_format = b'jpeg'
+    
+    xmins = []
+    xmaxs = []
+    ymins = []
+    ymaxs = []
+    classes_text = []
+    classes = []
+    
+    for index, label in enumerate(annotations):
 
+        xmin, xmax, ymin, ymax = build_bounding_box(label.box)
+
+        xmins.append(xmin / width)
+        xmaxs.append(xmax / width)
+        ymins.append(ymin / height)
+        ymaxs.append(ymax / height)
+        classes_text.append(class_text_to_int(label.type).encode('utf8'))
+        classes.append(label.type)
+    filename = filename.encode('utf8')
     tf_example = tf.train.Example(features=tf.train.Features(feature={
         'image/height': int64_feature(height),
         'image/width': int64_feature(width),
@@ -57,16 +96,16 @@ def download_tfr(filepath, temp_dir):
     # create data dir
     dest = os.path.join(temp_dir, 'raw')
     os.makedirs(dest, exist_ok=True)
-
+    filename = os.path.basename(filepath)
+    local_path = os.path.join(dest, filename)
+    if os.path.exists(local_path):
+        return local_path
     # download the tf record file
     cmd = ['gsutil', 'cp', filepath, f'{dest}']
     logger.info(f'Downloading {filepath}')
     res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if res.returncode != 0:
-        logger.error(f'Could not download file {filepath}') 
-    
-    filename = os.path.basename(filepath)
-    local_path = os.path.join(dest, filename)
+        logger.error(f'Could not download file {filepath}')    
     return local_path
 
 
@@ -100,11 +139,24 @@ def process_tfr(filepath, data_dir):
 def download_and_process(filename, temp_dir, data_dir):
     # need to re-import the logger because of multiprocesing
     logger = get_module_logger(__name__)
-    local_path = download_tfr(filename, temp_dir)
+
+
+    dest = os.path.join(temp_dir, 'raw')
+    os.makedirs(dest, exist_ok=True)
+    filename = os.path.basename(filename)
+    local_path = os.path.join(dest, filename)
+    
+
+    # local_path = download_tfr(filename, temp_dir) # Shut off downloading
     process_tfr(local_path, data_dir)
     # remove the original tf record to save space
-    logger.info(f'Deleting {local_path}')
-    os.remove(local_path)
+    # logger.info(f'Deleting {local_path}')
+    # os.remove(local_path)
+
+def class_text_to_int(text):
+    label_map = label_map_util.load_labelmap('./label_map.pbtxt')
+    label_map_dict = label_map_util.get_label_map_dict(label_map)
+    return dict((v,k) for k, v in label_map_dict.items())[text]
 
 
 if __name__ == "__main__": 
@@ -122,9 +174,9 @@ if __name__ == "__main__":
     
     data_dir = args.data_dir
     temp_dir = args.temp_dir
+    
     # init ray
     ray.init(num_cpus=cpu_count())
-
     workers = [download_and_process.remote(fn, temp_dir, data_dir) for fn in filenames[:100]]
     _ = ray.get(workers)
 
