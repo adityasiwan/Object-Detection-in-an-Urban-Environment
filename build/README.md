@@ -17,7 +17,7 @@ docker run -v <PATH TO LOCAL PROJECT FOLDER>:/app/project/ -ti project-dev bash
 ```
 
 ```
-docker run --gpus all -v /mnt/c/Users/Aditya/udacity/starter:/app/project/ -ti adityaef/udacity:new bash
+docker run -p 8888:8888 --gpus all -v /home/aditya/Downloads/starter:/app/project/ -ti adityaef/udacity:new bash
 ```
 and any other flag you find useful to your system (eg, `--shm-size`).
 
@@ -42,5 +42,8 @@ tf object detection api
 
 ```
 docker start be83c4afc784
-docker exec -it d0372d6ac691 bash
+docker exec -it 4ae5a3f6301c bash
+jupyter notebook --ip 0.0.0.0 --no-browser --allow-root
 ```
+
+docker run -it -p 8888:8888 --gpus all -v /mnt/c/Users/Aditya/udacity/starter:/app/project/ -ti adityaef/udacity:new bash

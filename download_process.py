@@ -99,6 +99,7 @@ def download_tfr(filepath, temp_dir):
     filename = os.path.basename(filepath)
     local_path = os.path.join(dest, filename)
     if os.path.exists(local_path):
+        logger.info(f'File already downloaded. Skipping download for the current file.')
         return local_path
     # download the tf record file
     cmd = ['gsutil', 'cp', filepath, f'{dest}']
@@ -141,17 +142,17 @@ def download_and_process(filename, temp_dir, data_dir):
     logger = get_module_logger(__name__)
 
 
-    dest = os.path.join(temp_dir, 'raw')
-    os.makedirs(dest, exist_ok=True)
-    filename = os.path.basename(filename)
-    local_path = os.path.join(dest, filename)
+    #dest = os.path.join(temp_dir, 'raw')
+    #os.makedirs(dest, exist_ok=True) # Uncomment to stop downloading
+    #filename = os.path.basename(filename)
+    #local_path = os.path.join(dest, filename)
     
 
-    # local_path = download_tfr(filename, temp_dir) # Shut off downloading
+    local_path = download_tfr(filename, temp_dir) # Shut off downloading by commenting
     process_tfr(local_path, data_dir)
     # remove the original tf record to save space
-    # logger.info(f'Deleting {local_path}')
-    # os.remove(local_path)
+    logger.info(f'Deleting {local_path}')
+    os.remove(local_path)
 
 def class_text_to_int(text):
     label_map = label_map_util.load_labelmap('./label_map.pbtxt')
@@ -176,7 +177,7 @@ if __name__ == "__main__":
     temp_dir = args.temp_dir
     
     # init ray
-    ray.init(num_cpus=cpu_count())
+    ray.init(num_cpus=6, dashboard_host="127.0.0.1")
     workers = [download_and_process.remote(fn, temp_dir, data_dir) for fn in filenames[:100]]
     _ = ray.get(workers)
 
