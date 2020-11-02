@@ -2,6 +2,7 @@ import argparse
 import glob
 import os
 import random
+import shutil
 
 import numpy as np
 
@@ -17,6 +18,45 @@ def split(data_dir):
         - data_dir [str]: data directory, /mnt/data
     """
     # TODO: Implement function
+    cwd = os.getcwd()
+    dir_list = ["train", "test", "val"]
+
+
+    source = data_dir
+
+    files = os.listdir(source)
+    num = len(files)
+
+
+
+    def create_dir(folder_name):
+        dir_path = "{}/{}".format(cwd, folder_name)
+        os.makedirs(dir_path, exist_ok=True)
+
+
+    def split(start, end, dest):
+        dest = cwd + '/' + dest
+        for f in files[start:end]:
+            shutil.move(source + '/'+ f, dest + '/'+ f)
+
+
+    for x in dir_list:
+        create_dir(x)
+
+    # For Train
+    start = 0
+    end = start + int(0.8 * num)
+    split(start, end, dir_list[0])
+
+    # For Test
+    start = end
+    end = start + int(0.1 * num)
+    split(start, end, dir_list[1])
+
+    # For Validation
+    start = end
+    end = num
+    split(start, end, dir_list[2])
     
 
 if __name__ == "__main__": 
@@ -28,3 +68,4 @@ if __name__ == "__main__":
     logger = get_module_logger(__name__)
     logger.info('Creating splits...')
     split(args.data_dir)
+    logger.info('Split completed')
