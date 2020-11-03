@@ -1,7 +1,11 @@
 build/
 backups/
+training/
 data/
 __pycache__/
 .ipynb_checkpoints/
-training/
+train/
+test/
+val/
+pre-trained-model/
 .DS_Store
