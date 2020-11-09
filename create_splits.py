@@ -17,16 +17,13 @@ def split(data_dir):
     args:
         - data_dir [str]: data directory, /mnt/data
     """
-    # TODO: Implement function
     cwd = os.getcwd()
     dir_list = ["train", "test", "val"]
-
 
     source = data_dir
 
     files = os.listdir(source)
     num = len(files)
-
 
 
     def create_dir(folder_name):
