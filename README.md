@@ -2,15 +2,17 @@
 
 ### Project overview
 
-This project uses [TensorFlow Object Detection API](https://github.com/tensorflow/models/blob/master/research/object_detection/README.md) where we can deploy our model to get predictions on the images sent to the API. We will use the [Waymo Open dataset](https://waymo.com/open/) which consists of high-resolution annotated images collected by Waymo self-driving cars in a wide variety of conditions. We will use this data to train and build our model so that the model can classify images from an urban environment into vehicles, pedestrians and cyclists.
+The detection and tracking of moving object is one of the most challenging tasks in designing a self-driving car. The detection of moving objects is important for safety and essential for avoiding collisions.
+
+This project uses [TensorFlow Object Detection API](https://github.com/tensorflow/models/blob/master/research/object_detection/README.md) where we can deploy our model to get predictions on the images sent to the API. We will use the [Waymo Open dataset](https://waymo.com/open/) which consists of high-resolution annotated images collected by Waymo self-driving cars in a wide variety of conditions. We will use this data to train and build our model so that the model can classify images from an urban environment into vehicles, pedestrians, and cyclists.
 
 ### Dataset
 
 #### Dataset analysis
 
-First we need to download the data from the [Waymo's Google Cloud bucket](https://console.cloud.google.com/storage/browser/waymo_open_dataset_v_1_2_0_individual_files/) to our local machine. For this project we only need a subset of the data provided (for example, we do not need to use the Lidar data). Therefore, we are going to download and trim immediately each file.
+First, we need to download the data from the [Waymo's Google Cloud bucket](https://console.cloud.google.com/storage/browser/waymo_open_dataset_v_1_2_0_individual_files/) to our local machine. For this project, we only need a subset of the data provided (for example, we do not need to use the Lidar data). Therefore, we are going to download and trim immediately each file.
 
-In `download_process.py` file `create_tf_example` function is implemented which takes the components of a Waymo Tf record and save them in the Tf Object Detection api format.
+In the `download_process.py` file `create_tf_example` function is implemented which takes the components of a Waymo Tf record and saves them in the Tf Object Detection API format. Below is the implementation.
 
 ```python
 def build_bounding_box(open_dataset_box):
@@ -29,7 +31,7 @@ def build_bounding_box(open_dataset_box):
 
 def create_tf_example(filename, encoded_jpeg, annotations):
     """
-    This function create a tf.train.Example from the Waymo frame.
+    This function creates a tf.train.Example from the Waymo frame.
 
     args:
         - filename [str]: name of the image
@@ -83,16 +85,18 @@ def create_tf_example(filename, encoded_jpeg, annotations):
 
 Once we are done with the `create_tf_example` function, we can execute
 
-`python download_process.py --data_dir /home/workspace/data/ --temp_dir /home/backups/`
+```bash
+python download_process.py --data_dir /home/workspace/data/ --temp_dir /home/backups/
+```
 
-to trim the original data. We can deduce that the size of the original `tfrecord` has shrinked thus we have successfully processed our data.
+to trim the original data. We can deduce that the size of the original `tfrecord` has shrunk thus we have successfully processed our data.
 
 After processing, we can explore our data by visualizing the annotations on the images by implementing the `display_instances` function as
 
 ```python
 def display_instances(batch):
     """
-    This function takes a batch from the dataset and display the image with
+    This function takes a batch from the dataset and displays the image with
     the associated bounding boxes.
     """
     batched_images = batch['image'].numpy()
@@ -121,13 +125,12 @@ The resultant image with the annotations are depicted below :
 
 ![explore image 2](./images/data_exploration/2.png)
 
-We can see that the images contain the bounding box for all 3 classes[vehicle, pedestrian and cyclist] colored in red, blue and green respectively.
+We can see that the images contain the bounding box for all 3 classes[vehicle, pedestrian, and cyclist] colored in red, blue, and green respectively.
 
-Also, we can se that the images contain mostly vehicles followed by pedestrian and cyclist.
+Also, we can see that the images contain mostly vehicles followed by pedestrians and cyclists.
 
 
 #### Cross validation
-This section should detail the cross validation strategy and justify your approach.
 
 Once, we have the data ready we now need to split it into `training`, `validation` and `testing`. For this, `split_data` function is implemented in the `create_splits.py` file as :
 
@@ -168,15 +171,15 @@ def split(data_dir):
     split(start, end, dir_list[2])
 ```
 
-This function splits the data into 80% training, 10% evaluation and 10% test. The training will be used to fit the model, validation will provide an unbiased evaluation of a model fit on the training dataset and the test will be used to provide an unbiased evaluation of a final model fit on the training dataset.
+This function splits the data into 80% training, 10% evaluation, and 10% test. The training will be used to fit the model, validation will provide an unbiased evaluation of a model fit on the training dataset and the test will be used to provide an unbiased evaluation of a final model fit on the training dataset.
 
-The choice of the ratio is based on the number of data points. If we had 100,000 data points then 99/0.5/0.5 would work fine as 5000 examples would represent variance in data but since in this case we are only using 100 data points, therefore 80/10/10 would capture the variance in the data. Some other choices that would also work fine : 75/15/10 or 80/15/5.
+The choice of the ratio is based on the number of data points. If we had 100,000 data points then 99/0.5/0.5 would work fine as 5000 examples would represent variance in data but since in this case, we are only using 100 data points, therefore 80/10/10 would capture the variance in the data. Some other choices that would also work fine: 75/15/10 or 80/15/5.
 
 
 ### Training
 #### Reference experiment
 
-Now that we have our data splitted, we can train it on the initial `config` provided. We use a tensorboard instance by running `tensorboard --logdir=training` to monitor the training. Our initial findings were :
+Now that we have our data split, we can train it on the initial `config` provided. We use a tensorboard instance by running `tensorboard --logdir=training` to monitor the training. Our initial findings are :
 
 ![loss](./images/reference-experiment/loss.png)
 
@@ -186,7 +189,23 @@ Now that we have our data splitted, we can train it on the initial `config` prov
 
 ![eval](./images/reference-experiment/eval_side_by_side_1.png)
 
-<<------------------------some points here-------------------->>
+The following points can be deducted :
+
+1. There is a lot of oscillations during training which is because the learning rate is 0.04 which is quite high.
+
+2. The model is not converging well even after 25000 steps.
+
+3. The mAP and recall are significantly low.
+
+Now we will save the model and create a video of our model's inferences for a tf record file. To do so, we run the following commands :
+
+```bash
+python .\exporter_main_v2.py --input_type image_tensor --pipeline_config_path <path-to-config> --trained_checkpoint_dir <path-to-trained-checkpoint> --output_directory <path-to-output_directory>
+```
+
+```bash
+python inference_video.py -labelmap_path label_map.pbtxt --model_path <path-to-saved-model> --tf_record_path <path-to-test-data> --config_path <path-to-config> --output_path <path-to-output_directory>
+```
 
 ![ouput](./images/reference-experiment/animation.gif)
 
@@ -194,11 +213,11 @@ Also, based on the video created on our reference model below is our findings :
 
 1. The model is over-fitted on vehicle class as it is misclassifying pedestrian as vehicle.
 2. There is no bounding box created for cyclist.
-3. The model's performance is not acceptable as for several instances trees are misclassified as vehicle.
+3. The model predicts a lot of false-positive as for several instances trees are misclassified as vehicle.
 
 #### Improve on the reference
 
-Since, the model did not perform well we tuned our `config` file to improve the model. Below are the changes that were made :
+Since the model did not perform well we need to tune our `config` file to improve the model. Below are the changes that were made :
 
 ```diff
 <       type: "ssd_resnet50_v1_fpn_keras"
@@ -232,16 +251,15 @@ Since, the model did not perform well we tuned our `config` file to improve the 
 >   num_steps: 60000
 ```
 
-The reason behind implementing this changes are :
+The reason behind implementing these changes are :
 
-1. `ssd_resnet101_v1_fpn_keras` is used as it has better mAP than `ResNet50` or `ResNet152` and also it is faster than ``ResNet50``. [Source](https://tfhub.dev/tensorflow/collections/object_detection/1)
+1. `ssd_resnet101_v1_fpn_keras` is used as it has better mAP than `ResNet50` or `ResNet152` and  it is also faster than ``ResNet50``. [Source](https://tfhub.dev/tensorflow/collections/object_detection/1)
 
-2.
+2. The [SSD: Single Shot MultiBox Detector](https://arxiv.org/pdf/1512.02325.pdf) paper states that using an extensive sampling strategy(in this case `ssd_random_crop`) can significantly improve the mAP by 8.8% therefore the `random_crop_image` is replaced with `ssd_random_crop`.
 
-3. Initialy our learning rate was high, so our model might not converge at all, therefore, learning rate was reduced and total_steps was increased for slower convergence.
+3. Initially our learning rate was high, so our model might not converge at all, therefore, the learning rate was reduced and total_steps was increased for slower convergence.
 
-<<------------------mention change with respect to config------------>>
-<<------------------discuss about data augmentation------------------>>
+With these changes in the `config` we were able to come up with an optimal data augmentation as shown below.
 
 ![aug3](./images/modified-experiment/new-augmentation/aug3.png)
 
@@ -249,7 +267,7 @@ The reason behind implementing this changes are :
 
 ![aug5](./images/modified-experiment/new-augmentation/aug5.png)
 
-<<------------------discuss------------>>
+Now, with these new setting, we will again train our model and we will use a tensorboard instance to monitor the training. Now, our findings are :
 
 ![loss](./images/modified-experiment/loss.png)
 
@@ -259,8 +277,12 @@ The reason behind implementing this changes are :
 
 ![eval](./images/modified-experiment/eval_side_by_side.png)
 
-<<------------------discuss------------>>
+We can clearly see that the model has improved significantly over our initial model. By reducing the learning rate we can now notice that the current model does not oscillate as compared to the previous and the loss charts show that the model is converging very well.
+
+Also, our mAP and recall have improved significantly.
+
+Now we will again save the new model and create a video of our model's inferences for a tf record file.
 
 ![ouput](./images/modified-experiment/animation.gif)
 
-<<------------------discuss------------>>
+While our initial model was misclassifying pedestrian as vehicles and there were a lot of false-positive but we can clearly see that the current model is correctly predicting all the vehicles and pedestrians,
