@@ -4,6 +4,11 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
+from utils import *
+from matplotlib import animation
+import matplotlib
+matplotlib.use('TkAgg')
+
 
 from object_detection.builders.dataset_builder import build as build_dataset
 from object_detection.utils.config_util import get_configs_from_pipeline_file
@@ -29,7 +34,7 @@ def main(labelmap_path, model_path, tf_record_path, config_path, output_path):
 
     # Load saved model and build the detection function
     logger.info(f'Loading model from {model_path}')
-    detect_fn = tf.saved_model.load(model_path)
+    detect_fn = tf.saved_model.load_v2(model_path)
 
     # open config file
     logger.info(f'Loading config from {config_path}')
