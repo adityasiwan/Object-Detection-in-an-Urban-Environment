@@ -125,14 +125,67 @@ The resultant image with the annotations are depicted below :
 
 ![explore image 2](./images/data_exploration/2.png)
 
-We can see that the images contain the bounding box for all 3 classes[vehicle, pedestrian, and cyclist] colored in red, blue, and green respectively.
+![explore image 3](./images/data_exploration/3.png)
 
-Also, we can see that the images contain mostly vehicles followed by pedestrians and cyclists.
+![explore image 4](./images/data_exploration/4.png)
+
+#### Qualitative analysis
+
+The images are captured in an urban environment. We can see that the images contain the bounding box for all 3 classes[vehicle, pedestrian, and cyclist] colored in red, blue, and green respectively.
+
+Also, we can see that the images contain mostly vehicles followed by pedestrians but cyclists is rare.
+
+The first two images are captured in overcast/cloudy weather, whereas the third image is captured during night with rain and the reflection from the water droplets on the camera can be easily noticed. The fourth image is captured in broad daylight.
+
+Therefore, it can be deduced that the dataset captures the variation in weather and lighting.
+
+#### Quantitative analysis
+
+For quantitative analysis of the data, the code can be found in Additional EDA section in [Exploratory Data Analysis.ipynb](Exploratory%20Data%20Analysis.ipynb). We will discuss about the data distribution(number of instance per class) and bounding box distribution.
+
+For this, 10 random .tfrecord files were looked into,
+
+
+|   |  vehicle  | pedestrian   | cyclist  |
+|---|----|----|---|
+| 0  | 47 | 21 | 1 |
+| 1  | 17 | 2  | 0 |
+| 2  | 25 | 0  | 0 |
+| 3  | 41 | 33 | 1 |
+| 4  | 10 | 1  | 0 |
+| 5  | 43 | 20 | 1 |
+| 6  | 11 | 1  | 0 |
+| 7  | 39 | 0  | 0 |
+| 8  | 18 | 0  | 0 |
+| 9  | 43 | 29 | 0 |
+
+It can be seen that the dataset is imbalanced/skewed towards `cyclist` class. The number of instances for vehicle class is the highest followed by pedestrian. The cyclist's class instances occurred only thrice in the 10 files combined. We will discuss possible strategy for the splitting of this skewed data in the cross validation section. The plot for the distribution is shown below :
+
+![plot1](./images/data_exploration/plt_1.png)
+
+Also, charts for bounding box height and width are shown below :
+
+![plot2](./images/data_exploration/plt_2.png)
+
+![plot3](./images/data_exploration/plt_3.png)
+
+It can be deduced that the bounding box height and bounding box width is always less than the image height(1280) and the image width(1920) and very few bounding box has height and width > 500 and most of the bounding box shape lies within < 200.
 
 
 #### Cross validation
 
-Once, we have the data ready we now need to split it into `training`, `validation` and `testing`. For this, `split_data` function is implemented in the `create_splits.py` file as :
+Once, we have the data ready we now need to split it into `training`, `validation` and `testing`. Since, we know from the quantitative analysis based on the distribution over the whole dataset that the dataset is skewed, as the number of instances of `cyclist` class is very low as compared to `vehicle` or `pedestrian`. Therefore, we will discuss some srategies and see if it can be applied to our cross validation or not :
+
+1. A widely adopted technique for dealing with highly unbalanced dataset is resampling. We will discuss both undersampling and oversamping with respect to our data :
+  - Since, undersampling involves removing samples from majority class, therefore in our case the `vehicle` class to match with the minority class. But, this will result in loss of information as the difference in the number of instances for `vehicle` class and `cyclist` class is very high.
+  - Likewise, oversampling involves adding more examples from the minority class. This is achieved by duplication of random records from the minority class which can cause overfitting.
+  - So, it is not feasible to use resampling technique for our data.
+
+2. We can also use [stratified split](https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.StratifiedKFold.html#sklearn.model_selection.StratifiedKFold) which split the dataset into train, test and validation set in a way that preserves the same proportions of examples in each class as observed in the original dataset. But the only difficulty using it is that it must load the whole dataset at once in the memory to perform the desired split, and due to limited RAM on my system, I was not able to use it as the dataset is quite large.
+
+Conclusion : Therefore, we will use random split to perform split on train, test and eval. We will use `shuffle()` to add randomness in the data.
+
+For this, `split_data` function is implemented in the `create_splits.py` file as :
 
 ```python
 def split(data_dir):
@@ -141,6 +194,7 @@ def split(data_dir):
     dir_list = ["train", "test", "val"]
     source = data_dir
     files = os.listdir(source)
+    random.shuffle(files)
     num = len(files)
 
     def create_dir(folder_name):

@@ -2,29 +2,35 @@ import argparse
 import io
 import os
 import subprocess
-
 import ray
 import tensorflow.compat.v1 as tf
+from utils import *
 from PIL import Image
 from psutil import cpu_count
-
-from utils import *
 from object_detection.utils import dataset_util, label_map_util
 
 
-
 def build_bounding_box(open_dataset_box):
+    """
+    a function to convert the current data (center_x, center_y, width, length)
+    to rectangular bounding box (left, top, right, bottom)
+
+    args:
+        - open_dataset_box [protobuf object]: bounding boxes
+    returns:
+        - rectangular bounding box co-ordinates
+    """
     center_x = open_dataset_box.center_x
     center_y = open_dataset_box.center_y
     length = open_dataset_box.length
     width = open_dataset_box.width
 
-
-    ymin = center_y -width / 2
-    ymax = center_y + width / 2
-    xmin = center_x -length / 2
-    xmax = center_x + length / 2
-    return xmin, xmax, ymin, ymax
+    # Convert the current data to rectangular bounding boxes
+    y_min = center_y - width / 2
+    y_max = center_y + width / 2
+    x_min = center_x - length / 2
+    x_max = center_x + length / 2
+    return x_min, x_max, y_min, y_max
 
 
 def create_tf_example(filename, encoded_jpeg, annotations):
@@ -44,18 +50,17 @@ def create_tf_example(filename, encoded_jpeg, annotations):
     encoded_jpg_io = io.BytesIO(encoded_jpeg)
     image = Image.open(encoded_jpg_io)
     width, height = image.size
-    
+
     image_format = b'jpeg'
-    
+
     xmins = []
     xmaxs = []
     ymins = []
     ymaxs = []
     classes_text = []
     classes = []
-    
-    for index, label in enumerate(annotations):
 
+    for index, label in enumerate(annotations):
         xmin, xmax, ymin, ymax = build_bounding_box(label.box)
 
         xmins.append(xmin / width)
@@ -106,7 +111,7 @@ def download_tfr(filepath, temp_dir):
     logger.info(f'Downloading {filepath}')
     res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if res.returncode != 0:
-        logger.error(f'Could not download file {filepath}')    
+        logger.error(f'Could not download file {filepath}')
     return local_path
 
 
@@ -141,26 +146,25 @@ def download_and_process(filename, temp_dir, data_dir):
     # need to re-import the logger because of multiprocesing
     logger = get_module_logger(__name__)
 
+    # dest = os.path.join(temp_dir, 'raw')
+    # os.makedirs(dest, exist_ok=True) # Uncomment to stop downloading
+    # filename = os.path.basename(filename)
+    # local_path = os.path.join(dest, filename)
 
-    #dest = os.path.join(temp_dir, 'raw')
-    #os.makedirs(dest, exist_ok=True) # Uncomment to stop downloading
-    #filename = os.path.basename(filename)
-    #local_path = os.path.join(dest, filename)
-    
-
-    local_path = download_tfr(filename, temp_dir) # Shut off downloading by commenting
+    local_path = download_tfr(filename, temp_dir)  # Shut off downloading by commenting
     process_tfr(local_path, data_dir)
     # remove the original tf record to save space
     logger.info(f'Deleting {local_path}')
     os.remove(local_path)
 
+
 def class_text_to_int(text):
     label_map = label_map_util.load_labelmap('./label_map.pbtxt')
     label_map_dict = label_map_util.get_label_map_dict(label_map)
-    return dict((v,k) for k, v in label_map_dict.items())[text]
+    return dict((v, k) for k, v in label_map_dict.items())[text]
 
 
-if __name__ == "__main__": 
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Download and process tf files')
     parser.add_argument('--data_dir', required=True,
                         help='processed data directory')
@@ -170,16 +174,13 @@ if __name__ == "__main__":
     logger = get_module_logger(__name__)
     # open the filenames file
     with open('filenames.txt', 'r') as f:
-        filenames = f.read().splitlines() 
+        filenames = f.read().splitlines()
     logger.info(f'Download {len(filenames)} files. Be patient, this will take a long time.')
-    
+
     data_dir = args.data_dir
     temp_dir = args.temp_dir
-    
+
     # init ray
     ray.init(num_cpus=6, dashboard_host="127.0.0.1")
     workers = [download_and_process.remote(fn, temp_dir, data_dir) for fn in filenames[:100]]
     _ = ray.get(workers)
-
-
-
